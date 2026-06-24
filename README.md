@@ -33,7 +33,7 @@ chmod +x setup-secrets.sh && sudo ./setup-secrets.sh
 | `secrets-verify` | Проверка кода (с окном ±10 мин) |
 | `secret-exec` | Выполнение команды с секретом (OTP-gated) |
 | `secrets-uri` | Показать QR для телефона (root-only) |
-| `secrets-vault-app.html` | Приложение для телефона (offline) |
+| `index.html` | Приложение для телефона (offline) |
 
 ## Рабочий процесс
 
