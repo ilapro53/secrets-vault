@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>🔐 Secrets Vault — Command OTP</title>
+<title>🔐 Secrets Vault</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -14,10 +14,30 @@ body {
 }
 .card {
   background: #1a1a2e; border-radius: 16px; padding: 28px 24px;
-  width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  width: 100%; max-width: 500px; box-shadow: 0 8px 32px rgba(0,0,0,.4);
 }
 h1 { font-size: 20px; margin-bottom: 4px; text-align: center; color: #7c5cfc; }
 .subtitle { font-size: 12px; color: #555; text-align: center; margin-bottom: 16px; }
+
+/* Mode Tabs */
+.mode-tabs {
+  display: flex; gap: 4px; margin-bottom: 16px;
+  background: #0d0d1a; border-radius: 10px; padding: 3px;
+}
+.mode-tab {
+  flex: 1; padding: 8px; border-radius: 8px; border: none;
+  background: transparent; color: #666; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+}
+.mode-tab.active {
+  background: #7c5cfc; color: #fff;
+}
+.mode-tab:hover:not(.active) { color: #999; }
+
+/* Panels */
+.panel { display: none; }
+.panel.active { display: block; }
+
 label { display: block; font-size: 13px; color: #999; margin-bottom: 4px; margin-top: 14px; }
 input, textarea {
   width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #333;
@@ -48,6 +68,20 @@ textarea { resize: vertical; min-height: 44px; }
 .code-display .hint { font-size: 11px; color: #555; margin-top: 10px; }
 .error { color: #f44336; font-size: 13px; margin-top: 6px; display: none; }
 .setup-hint { font-size: 11px; color: #555; margin-top: 16px; text-align: center; }
+.tip { font-size: 11px; color: #7c5cfc; margin-top: 4px; }
+.setup-hint code { background: #16162a; padding: 1px 4px; border-radius: 3px; }
+
+.help-toggle {
+  display: inline-block; font-size: 11px; color: #555; cursor: pointer;
+  margin-top: 8px; text-decoration: underline; text-decoration-style: dotted;
+}
+.help-text {
+  display: none; font-size: 11px; color: #777; background: #16162a;
+  padding: 10px; border-radius: 8px; margin-top: 6px; line-height: 1.5;
+  white-space: pre-wrap;
+}
+.help-text.show { display: block; }
+
 .pulse { animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 </style>
@@ -57,11 +91,47 @@ textarea { resize: vertical; min-height: 44px; }
   <h1>🔐 Secrets Vault</h1>
   <div class="subtitle">Command-bound OTP · окно 5 мин</div>
 
+  <!-- Secret key -->
   <label for="secretInput">Secret key (из QR/setup)</label>
   <input type="password" id="secretInput" placeholder="Вставьте secret key...">
 
-  <label for="cmdInput">Команда (от агента)</label>
-  <textarea id="cmdInput" placeholder="Например: ssh/deploy-key" rows="2"></textarea>
+  <!-- Mode Tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="simple" onclick="switchMode('simple')">📄 Команда</button>
+    <button class="mode-tab" data-mode="script" onclick="switchMode('script')">📜 Полный скрипт</button>
+  </div>
+
+  <!-- Simple mode (old-style command name) -->
+  <div class="panel active" id="panel-simple">
+    <label for="cmdInput">Имя команды (из pass)</label>
+    <textarea id="cmdInput" placeholder="Например: ssh/deploy-key" rows="2"></textarea>
+    <div class="tip">Введи имя секрета из pass, например: ssh/deploy, github/token</div>
+  </div>
+
+  <!-- Script mode (new-style heredoc) -->
+  <div class="panel" id="panel-script">
+    <label for="scriptInput">Команда от агента (целиком)</label>
+    <textarea id="scriptInput" placeholder="Вставь сюда всю команду, которую прислал агент...
+
+Например:
+secrets-bash-executor --secrets VPS_HOST,VPS_KEY - <<'SCRIPT'
+ssh -i "$VPS_KEY" root@"$VPS_HOST" 'uptime'
+SCRIPT" rows="6"></textarea>
+    <div class="tip">Скопируй команду от агента целиком и вставь сюда как есть</div>
+    <span class="help-toggle" onclick="toggleHelp()">❓ Как это работает?</span>
+    <div class="help-text" id="helpText">
+Агент присылает команду вида:
+  secrets-bash-executor --secrets VAR1,VAR2 - <<'SCRIPT'
+  ... script with $VAR1, $VAR2 ...
+  SCRIPT
+
+Ты копируешь ВСЁ это (от "secrets-bash-executor" до "SCRIPT") и вставляешь сюда.
+Приложение вычисляет код на основе всего текста команды.
+Если изменить хоть букву — код станет другим.
+
+Код привязан к конкретному скрипту + времени (окно 5 мин).
+    </div>
+  </div>
 
   <button class="btn" onclick="generateCode()">🔑 Сгенерировать код</button>
 
@@ -74,7 +144,7 @@ textarea { resize: vertical; min-height: 44px; }
     <span class="code-current" id="labelCurrent">← текущий (действителен 5 мин)</span>
     <span class="code-next" id="labelNext">← следующий (можно заранее)</span>
     <div class="remaining" id="remaining">Обновится через 5м 00с</div>
-    <div class="hint">Скажи агенту оба кода: XXXXXX-YYYYYY</div>
+    <div class="hint" id="modeHint">Скажи агенту оба кода: XXXXXX-YYYYYY</div>
     <button class="btn btn-secondary" id="clearBtn" onclick="clearSecret()">Очистить секрет</button>
   </div>
 
@@ -87,6 +157,21 @@ textarea { resize: vertical; min-height: 44px; }
 </div>
 
 <script>
+let currentMode = 'simple';
+let lastWindow = -1;
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + mode));
+  document.getElementById('codeDisplay').style.display = 'none';
+  document.getElementById('error').style.display = 'none';
+}
+
+function toggleHelp() {
+  document.getElementById('helpText').classList.toggle('show');
+}
+
 function base32ToBytes(b32) {
   const map = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   b32 = b32.replace(/[^A-Za-z2-7]/g, '').toUpperCase();
@@ -109,19 +194,16 @@ function toHex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function genOTP(keyBytes, cmd, tw) {
-  const msg = cmd + '|' + tw;
+async function genOTP(keyBytes, msg, tw) {
   const enc = new TextEncoder();
-  const msgBytes = enc.encode(msg);
-  return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
-    .then(key => crypto.subtle.sign('HMAC', key, msgBytes))
-    .then(sig => {
-      const hmac = toHex(new Uint8Array(sig));
-      const offset = parseInt(hmac.slice(-1), 16) * 2;
-      const partial = parseInt(hmac.substr(offset, 8), 16);
-      const otp = (partial & 0x7fffffff) % 1000000;
-      return String(otp).padStart(6, '0');
-    });
+  const msgBytes = enc.encode(msg + '|' + tw);
+  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const sig = await crypto.subtle.sign('HMAC', key, msgBytes);
+  const hmac = toHex(new Uint8Array(sig));
+  const offset = parseInt(hmac.slice(-1), 16) * 2;
+  const partial = parseInt(hmac.substr(offset, 8), 16);
+  const otp = (partial & 0x7fffffff) % 1000000;
+  return String(otp).padStart(6, '0');
 }
 
 async function generateCode() {
@@ -131,15 +213,38 @@ async function generateCode() {
 
   error.style.display = 'none';
 
-  let secret = $('secretInput').value.trim();
-  const cmd = $('cmdInput').value.trim();
+  const secret = $('secretInput').value.trim();
+  if (!secret) {
+    error.textContent = 'Вставьте secret key';
+    error.style.display = 'block';
+    return;
+  }
 
-  if (!secret) { error.textContent = 'Вставьте secret key'; error.style.display = 'block'; return; }
-  if (!cmd) { error.textContent = 'Введите команду'; error.style.display = 'block'; return; }
+  let hashInput;
 
-  try { localStorage.setItem('sv_secret', secret); } catch(e) {}
+  if (currentMode === 'simple') {
+    const cmd = $('cmdInput').value.trim();
+    if (!cmd) {
+      error.textContent = 'Введите имя команды';
+      error.style.display = 'block';
+      return;
+    }
+    hashInput = cmd;
+    $('modeHint').textContent = 'Скажи агенту: код для ' + cmd;
+  } else {
+    const script = $('scriptInput').value;
+    if (!script.trim()) {
+      error.textContent = 'Вставьте команду от агента';
+      error.style.display = 'block';
+      return;
+    }
+    // Strip trailing whitespace for consistent hashing with server
+    hashInput = script.replace(/\s+$/, '');
+    $('modeHint').textContent = 'Скажи агенту оба кода: XXXXXX-YYYYYY';
+  }
 
   try {
+    localStorage.setItem('sv_secret', secret);
     const keyBytes = base32ToBytes(secret);
 
     const now = Math.floor(Date.now() / 1000);
@@ -148,8 +253,8 @@ async function generateCode() {
     const minutes = Math.floor(windowRemaining / 60);
     const seconds = windowRemaining % 60;
 
-    const c1 = await genOTP(keyBytes, cmd, timeWindow);
-    const c2 = await genOTP(keyBytes, cmd, timeWindow + 1);
+    const c1 = await genOTP(keyBytes, hashInput, timeWindow);
+    const c2 = await genOTP(keyBytes, hashInput, timeWindow + 1);
 
     $('codeCurrent').textContent = c1;
     $('codeNext').textContent = c2;
@@ -157,7 +262,7 @@ async function generateCode() {
     $('labelCurrent').textContent = c1 + ' — текущий (5 мин)';
     $('labelNext').textContent = c2 + ' — следующий (можно заранее)';
     codeDisplay.style.display = 'block';
-  } catch(e) {
+  } catch (e) {
     error.textContent = 'Ошибка: ' + e.message;
     error.style.display = 'block';
   }
@@ -167,7 +272,7 @@ function clearSecret() {
   document.getElementById('secretInput').value = '';
   document.getElementById('codeDisplay').style.display = 'none';
   document.getElementById('clearBtn').style.display = 'none';
-  try { localStorage.removeItem('sv_secret'); } catch(e) {}
+  try { localStorage.removeItem('sv_secret'); } catch (e) {}
 }
 
 // Restore saved secret or load from URL param ?key=
@@ -181,10 +286,7 @@ try {
     const s = localStorage.getItem('sv_secret');
     if (s) document.getElementById('secretInput').value = s;
   }
-} catch(e) {}
-
-// Track window to auto-regenerate on boundary
-let lastWindow = -1;
+} catch (e) {}
 
 // Update timer every second, regenerate codes on window change
 setInterval(() => {
@@ -196,7 +298,6 @@ setInterval(() => {
     const s = windowRemaining % 60;
     document.getElementById('remaining').textContent = 'Обновится через ' + m + 'м ' + s + 'с (окно 5 мин)';
 
-    // Regenerate codes when window changes
     if (timeWindow !== lastWindow) {
       lastWindow = timeWindow;
       generateCode();

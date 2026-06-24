@@ -59,7 +59,7 @@ ok "/etc/sudoers.d/secrets-otp"
 
 # 4. Install scripts
 msg "Installing scripts..."
-for f in secrets-otp secrets-verify secret-exec; do
+for f in secrets-otp secrets-verify secret-exec secrets-bash-executor; do
     if [ -f "$REPO_DIR/$f" ]; then
         cp "$REPO_DIR/$f" "/usr/local/bin/$f"
         chmod 755 "/usr/local/bin/$f"
