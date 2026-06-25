@@ -142,7 +142,10 @@ SCRIPT" rows="3"></textarea>
 
     <div class="code-display" id="encryptResult" style="display:none">
       <div style="font-size:11px;color:#666;margin-bottom:4px">Скопируй и отправь агенту:</div>
-      <div style="font-size:13px;font-weight:600;word-break:break-all;color:#7c5cfc;background:#0d0d1a;padding:12px;border-radius:8px;font-family:monospace" id="encryptOutput"></div>
+      <div style="display:flex;align-items:flex-start;gap:6px">
+        <div style="flex:1;font-size:13px;font-weight:600;word-break:break-all;color:#7c5cfc;background:#0d0d1a;padding:12px;border-radius:8px;font-family:monospace" id="encryptOutput"></div>
+        <button onclick="copyEncrypted(this)" title="Скопировать SECRET_..." style="flex-shrink:0;background:none;border:1px solid #444;border-radius:6px;color:#999;cursor:pointer;font-size:16px;padding:4px 8px;margin-top:8px;line-height:1;transition:all .15s" onmouseover="this.style.color='#7c5cfc';this.style.borderColor='#7c5cfc'" onmouseout="this.style.color='#999';this.style.borderColor='#444'">📋</button>
+      </div>
 
       <div class="remaining" id="encryptRemaining" style="font-size:12px;color:#666;margin-top:6px"></div>
 
@@ -163,7 +166,7 @@ SCRIPT" rows="3"></textarea>
       <div class="code-pair" id="codePair">
         <span id="codeCurrent">------</span><span class="sep">-</span><span id="codeNext">------</span>
       </div>
-      <button onclick="copyCode()" title="Скопировать код" style="background:none;border:1px solid #444;border-radius:6px;color:#999;cursor:pointer;font-size:16px;padding:4px 8px;line-height:1;transition:all .15s" onmouseover="this.style.color='#7c5cfc';this.style.borderColor='#7c5cfc'" onmouseout="this.style.color='#999';this.style.borderColor='#444'">📋</button>
+      <button onclick="copyCode(this)" title="Скопировать код" style="background:none;border:1px solid #444;border-radius:6px;color:#999;cursor:pointer;font-size:16px;padding:4px 8px;line-height:1;transition:all .15s" onmouseover="this.style.color='#7c5cfc';this.style.borderColor='#7c5cfc'" onmouseout="this.style.color='#999';this.style.borderColor='#444'">📋</button>
     </div>
     <span class="code-current" id="labelCurrent">← текущий (действителен 5 мин)</span>
     <span class="code-next" id="labelNext">← следующий (можно заранее)</span>
@@ -405,12 +408,18 @@ async function encryptOperation() {
   }
 }
 
-function copyCode() {
+function copyEncrypted(btn) {
+  const text = document.getElementById('encryptOutput').textContent;
+  navigator.clipboard.writeText(text).catch(() => {});
+  btn.textContent = '✅';
+  setTimeout(() => btn.textContent = '📋', 1500);
+}
+
+function copyCode(btn) {
   const current = document.getElementById('codeCurrent').textContent;
   const next = document.getElementById('codeNext').textContent;
   const text = current + '-' + next;
   navigator.clipboard.writeText(text).catch(() => {});
-  const btn = event.target;
   btn.textContent = '✅';
   setTimeout(() => btn.textContent = '📋', 1500);
 }
