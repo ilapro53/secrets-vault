@@ -159,8 +159,11 @@ SCRIPT" rows="3"></textarea>
   <div class="error" id="error"></div>
 
   <div class="code-display" id="codeDisplay">
-    <div class="code-pair" id="codePair">
-      <span id="codeCurrent">------</span><span class="sep">-</span><span id="codeNext">------</span>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+      <div class="code-pair" id="codePair">
+        <span id="codeCurrent">------</span><span class="sep">-</span><span id="codeNext">------</span>
+      </div>
+      <button onclick="copyCode()" title="Скопировать код" style="background:none;border:1px solid #444;border-radius:6px;color:#999;cursor:pointer;font-size:16px;padding:4px 8px;line-height:1;transition:all .15s" onmouseover="this.style.color='#7c5cfc';this.style.borderColor='#7c5cfc'" onmouseout="this.style.color='#999';this.style.borderColor='#444'">📋</button>
     </div>
     <span class="code-current" id="labelCurrent">← текущий (действителен 5 мин)</span>
     <span class="code-next" id="labelNext">← следующий (можно заранее)</span>
@@ -400,6 +403,16 @@ async function encryptOperation() {
     error.textContent = 'Ошибка: ' + e.message;
     error.style.display = 'block';
   }
+}
+
+function copyCode() {
+  const current = document.getElementById('codeCurrent').textContent;
+  const next = document.getElementById('codeNext').textContent;
+  const text = current + '-' + next;
+  navigator.clipboard.writeText(text).catch(() => {});
+  const btn = event.target;
+  btn.textContent = '✅';
+  setTimeout(() => btn.textContent = '📋', 1500);
 }
 
 function clearSecret() {
