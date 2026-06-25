@@ -50,16 +50,29 @@ ok "/root/.secrets-otp/totp-secret"
 # 3. Sudoers
 msg "Creating sudoers..."
 cat > /etc/sudoers.d/secrets-otp << 'SUDO'
-# Secrets Vault
-ALL ALL=(root) NOPASSWD: /usr/l…-otp *
-ALL ALL=(root) NOPASSWD: /usr/l…rify *
+# Secrets Vault — passwordless access for OTP tools
+ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-otp *
+ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-verify *
+ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-bash-executor *
+ALL ALL=(root) NOPASSWD: /bin/cat /root/.secrets-otp/totp-secret
 SUDO
 chmod 440 /etc/sudoers.d/secrets-otp
 ok "/etc/sudoers.d/secrets-otp"
 
 # 4. Install scripts
 msg "Installing scripts..."
-for f in secrets-otp secrets-verify secret-exec secrets-bash-executor; do
+for f in secrets-otp secrets-verify secret-exec; do
+    if [ -f "$REPO_DIR/$f" ]; then
+        cp "$REPO_DIR/$f" "/usr/local/bin/$f"
+        chmod 755 "/usr/local/bin/$f"
+        ok "/usr/local/bin/$f"
+    else
+        warn "$f not found in repo"
+    fi
+done
+
+# secrets-bash-executor (bash wrapper + Python core)
+for f in secrets-bash-executor .secrets-bash-executor-core.py; do
     if [ -f "$REPO_DIR/$f" ]; then
         cp "$REPO_DIR/$f" "/usr/local/bin/$f"
         chmod 755 "/usr/local/bin/$f"
