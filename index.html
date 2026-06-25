@@ -96,40 +96,46 @@ textarea { resize: vertical; min-height: 44px; }
   <input type="password" id="secretInput" placeholder="Вставьте secret key...">
 
   <!-- Mode Tabs -->
-  <div class="mode-tabs">
-    <button class="mode-tab active" data-mode="simple" onclick="switchMode('simple')">📄 Команда</button>
-    <button class="mode-tab" data-mode="script" onclick="switchMode('script')">📜 Полный скрипт</button>
+  <div class="mode-tabs" id="mainTabs">
+    <button class="mode-tab active" data-mode="code" onclick="switchMode('code')">📋 Код</button>
+    <button class="mode-tab" data-mode="encrypt" onclick="switchMode('encrypt')">🔒 Операция</button>
   </div>
 
-  <!-- Simple mode (old-style command name) -->
-  <div class="panel active" id="panel-simple">
-    <label for="cmdInput">Имя команды (из pass)</label>
-    <textarea id="cmdInput" placeholder="Например: ssh/deploy-key" rows="2"></textarea>
-    <div class="tip">Введи имя секрета из pass, например: ssh/deploy, github/token</div>
-  </div>
+  <!-- Code generation mode (simplified — one field) -->
+  <div class="panel active" id="panel-code">
+    <label for="codeInput">Имя секрета или команда агента</label>
+    <textarea id="codeInput" placeholder="Например: ssh/deploy-key
 
-  <!-- Script mode (new-style heredoc) -->
-  <div class="panel" id="panel-script">
-    <label for="scriptInput">Команда от агента (целиком)</label>
-    <textarea id="scriptInput" placeholder="Вставь сюда всю команду, которую прислал агент...
-
-Например:
+Или целиком команда от агента:
 secrets-bash-executor --secrets VPS_HOST,VPS_KEY - <<'SCRIPT'
-ssh -i "$VPS_KEY" root@"$VPS_HOST" 'uptime'
-SCRIPT" rows="6"></textarea>
-    <div class="tip">Скопируй команду от агента целиком и вставь сюда как есть</div>
-    <span class="help-toggle" onclick="toggleHelp()">❓ Как это работает?</span>
-    <div class="help-text" id="helpText">
-Агент присылает команду вида:
-  secrets-bash-executor --secrets VAR1,VAR2 - <<'SCRIPT'
-  ... script with $VAR1, $VAR2 ...
-  SCRIPT
+ssh ...
+SCRIPT" rows="3"></textarea>
+    <div class="tip">Вставь имя секрета из pass или команду агента целиком — код будет одинаковым</div>
+  </div>
 
-Ты копируешь ВСЁ это (от "secrets-bash-executor" до "SCRIPT") и вставляешь сюда.
-Приложение вычисляет код на основе всего текста команды.
-Если изменить хоть букву — код станет другим.
+  <!-- Encrypted operation mode -->
+  <div class="panel" id="panel-encrypt">
+    <label for="opType">Операция</label>
+    <select id="opType" onchange="toggleOpValue()" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #333;background:#16162a;color:#fff;font-size:15px">
+      <option value="set_secret">set_secret — добавить/обновить секрет</option>
+      <option value="delete_secret">delete_secret — удалить секрет</option>
+    </select>
 
-Код привязан к конкретному скрипту + времени (окно 5 мин).
+    <label for="opName">Имя секрета (pass path)</label>
+    <input type="text" id="opName" placeholder="Например: github/token" autocomplete="off">
+
+    <div id="opValueGroup">
+      <label for="opValue">Значение секрета</label>
+      <textarea id="opValue" placeholder="Секрет, который агент НЕ должен увидеть..." rows="2"></textarea>
+      <div class="tip">Агент увидит только SECRET_..., само значение останется зашифрованным</div>
+    </div>
+
+    <button class="btn" onclick="encryptOperation()">🔒 Зашифровать и получить команду</button>
+
+    <div class="code-display" id="encryptResult" style="display:none">
+      <div style="font-size:11px;color:#666;margin-bottom:4px">Скопируй и отправь агенту:</div>
+      <div style="font-size:13px;font-weight:600;word-break:break-all;color:#7c5cfc;background:#0d0d1a;padding:12px;border-radius:8px;font-family:monospace" id="encryptOutput"></div>
+      <div class="hint">Агент выполнит: secrets-encrypted-op SECRET_...</div>
     </div>
   </div>
 
@@ -157,7 +163,7 @@ SCRIPT" rows="6"></textarea>
 </div>
 
 <script>
-let currentMode = 'simple';
+let currentMode = 'code';
 let lastWindow = -1;
 
 function switchMode(mode) {
@@ -165,11 +171,13 @@ function switchMode(mode) {
   document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + mode));
   document.getElementById('codeDisplay').style.display = 'none';
+  document.getElementById('encryptResult').style.display = 'none';
   document.getElementById('error').style.display = 'none';
 }
 
-function toggleHelp() {
-  document.getElementById('helpText').classList.toggle('show');
+function toggleOpValue() {
+  const op = document.getElementById('opType').value;
+  document.getElementById('opValueGroup').style.display = op === 'set_secret' ? 'block' : 'none';
 }
 
 function base32ToBytes(b32) {
@@ -194,6 +202,25 @@ function toHex(bytes) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function hexToBytes(hex) {
+  const bytes = [];
+  for (let i = 0; i < hex.length; i += 2)
+    bytes.push(parseInt(hex.substr(i, 2), 16));
+  return new Uint8Array(bytes);
+}
+
+function toBase64(bytes) {
+  const bin = String.fromCharCode(...bytes);
+  return btoa(bin);
+}
+
+function fromBase64(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
 async function genOTP(keyBytes, msg, tw) {
   const enc = new TextEncoder();
   const msgBytes = enc.encode(msg + '|' + tw);
@@ -206,6 +233,20 @@ async function genOTP(keyBytes, msg, tw) {
   return String(otp).padStart(6, '0');
 }
 
+// ── AES-128-CBC encryption (browser) ───────────────────────────────────────
+async function aesEncrypt(key16, plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+  const aesKey = await crypto.subtle.importKey('raw', key16, { name: 'AES-CBC' }, false, ['encrypt']);
+  const encoded = new TextEncoder().encode(plaintext);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-CBC', iv }, aesKey, encoded);
+  const encArr = new Uint8Array(encrypted);
+  const combined = new Uint8Array(iv.length + encArr.length);
+  combined.set(iv);
+  combined.set(encArr, iv.length);
+  return combined;
+}
+
+// ── Code generation (simplified — one textarea) ───────────────────────────
 async function generateCode() {
   const $ = id => document.getElementById(id);
   const error = $('error');
@@ -220,28 +261,13 @@ async function generateCode() {
     return;
   }
 
-  let hashInput;
-
-  if (currentMode === 'simple') {
-    const cmd = $('cmdInput').value.trim();
-    if (!cmd) {
-      error.textContent = 'Введите имя команды';
-      error.style.display = 'block';
-      return;
-    }
-    hashInput = cmd;
-    $('modeHint').textContent = 'Скажи агенту: код для ' + cmd;
-  } else {
-    const script = $('scriptInput').value;
-    if (!script.trim()) {
-      error.textContent = 'Вставьте команду от агента';
-      error.style.display = 'block';
-      return;
-    }
-    // Strip trailing whitespace for consistent hashing with server
-    hashInput = script.replace(/\s+$/, '');
-    $('modeHint').textContent = 'Скажи агенту оба кода: XXXXXX-YYYYYY';
+  const input = $('codeInput').value;
+  if (!input.trim()) {
+    error.textContent = 'Введите имя секрета или команду';
+    error.style.display = 'block';
+    return;
   }
+  const hashInput = input.replace(/\s+$/, '');
 
   try {
     localStorage.setItem('sv_secret', secret);
@@ -261,7 +287,71 @@ async function generateCode() {
     $('remaining').textContent = 'Обновится через ' + minutes + 'м ' + seconds + 'с (окно 5 мин)';
     $('labelCurrent').textContent = c1 + ' — текущий (5 мин)';
     $('labelNext').textContent = c2 + ' — следующий (можно заранее)';
+    $('modeHint').textContent = 'Скажи агенту оба кода: ' + c1 + '-' + c2;
     codeDisplay.style.display = 'block';
+  } catch (e) {
+    error.textContent = 'Ошибка: ' + e.message;
+    error.style.display = 'block';
+  }
+}
+
+// ── Encrypted operation (set_secret / delete_secret) ──────────────────────
+async function encryptOperation() {
+  const $ = id => document.getElementById(id);
+  const error = $('error');
+
+  error.style.display = 'none';
+  $('encryptResult').style.display = 'none';
+
+  const secret = $('secretInput').value.trim();
+  if (!secret) {
+    error.textContent = 'Вставьте secret key';
+    error.style.display = 'block';
+    return;
+  }
+
+  const op = $('opType').value;
+  const name = $('opName').value.trim();
+  if (!name) {
+    error.textContent = 'Введите имя секрета';
+    error.style.display = 'block';
+    return;
+  }
+  if (!/^[a-zA-Z0-9_\/.-]+$/.test(name)) {
+    error.textContent = 'Имя секрета содержит недопустимые символы';
+    error.style.display = 'block';
+    return;
+  }
+
+  let value = '';
+  if (op === 'set_secret') {
+    value = $('opValue').value;
+    if (!value.trim()) {
+      error.textContent = 'Введите значение секрета';
+      error.style.display = 'block';
+      return;
+    }
+  }
+
+  try {
+    localStorage.setItem('sv_secret', secret);
+    const keyBytes = base32ToBytes(secret);
+    const tw = Math.floor(Date.now() / 1000 / 300);
+
+    // Generate OTP bound to this operation + secret name
+    const otpCmd = 'encrypted_' + op + ' ' + name;
+    const otp = await genOTP(keyBytes, otpCmd, tw);
+
+    // Build plaintext: <operation> <name> <otp> [value]
+    const plaintext = op + ' ' + name + ' ' + otp + (value ? '\n' + value : '');
+
+    // Encrypt with AES-128-CBC (first 16 bytes of key)
+    const aesKey = keyBytes.slice(0, 16);
+    const encrypted = await aesEncrypt(aesKey, plaintext);
+    const hex = toHex(encrypted);
+
+    $('encryptOutput').textContent = 'SECRET_' + hex;
+    $('encryptResult').style.display = 'block';
   } catch (e) {
     error.textContent = 'Ошибка: ' + e.message;
     error.style.display = 'block';
@@ -290,7 +380,8 @@ try {
 
 // Update timer every second, regenerate codes on window change
 setInterval(() => {
-  if (document.getElementById('codeDisplay').style.display === 'block') {
+  const cd = document.getElementById('codeDisplay');
+  if (cd && cd.style.display === 'block') {
     const now = Math.floor(Date.now() / 1000);
     const timeWindow = Math.floor(now / 300);
     const windowRemaining = 300 - (now % 300);
