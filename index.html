@@ -60,8 +60,15 @@ textarea { resize: vertical; min-height: 44px; }
 }
 .code-pair {
   font-size: 40px; font-weight: 700; letter-spacing: 3px; color: #7c5cfc;
+  white-space: nowrap;
 }
 .code-pair .sep { color: #444; }
+@media (max-width:480px) {
+  .code-pair { font-size: 24px; letter-spacing: 2px; }
+}
+@media (max-width:360px) {
+  .code-pair { font-size: 18px; letter-spacing: 1px; }
+}
 .code-current { font-size: 13px; color: #666; display: block; margin-top: 4px; }
 .code-next { font-size: 12px; color: #4caf50; display: block; margin-top: 2px; }
 .code-display .remaining { font-size: 12px; color: #666; margin-top: 6px; }
