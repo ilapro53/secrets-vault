@@ -9,7 +9,7 @@ ok()   { echo -e "  ${GRN}✓${RST} $*"; }
 info() { echo -e "  ${CYN}→${RST} $*"; }
 warn() { echo -e "  ${YLW}⚠${RST} $*"; }
 err()  { echo -e "  ${RED}✗${RST} $*"; }
-TOTAL=10
+TOTAL=11
 
 echo "╔══════════════════════════════════════════════════╗"
 echo "║   Secrets Vault v${SCRIPT_VERSION}                         ║"
@@ -137,7 +137,27 @@ else
     ok "pass initialized"
 fi
 
-# 8. Bash aliases
+# 8. GPG agent — no caching (each secret operation asks passphrase)
+msg "Hardening GPG agent..."
+mkdir -p "$REAL_HOME/.gnupg"
+chmod 700 "$REAL_HOME/.gnupg"
+GPG_CONF="$REAL_HOME/.gnupg/gpg-agent.conf"
+if grep -q '^default-cache-ttl' "$GPG_CONF" 2>/dev/null; then
+    sed -i 's/^default-cache-ttl.*/default-cache-ttl 0/' "$GPG_CONF"
+else
+    echo 'default-cache-ttl 0' >> "$GPG_CONF"
+fi
+# Also disable ssh-agent-like passphrase caching
+if grep -q '^max-cache-ttl' "$GPG_CONF" 2>/dev/null; then
+    sed -i 's/^max-cache-ttl.*/max-cache-ttl 0/' "$GPG_CONF"
+else
+    echo 'max-cache-ttl 0' >> "$GPG_CONF"
+fi
+chown -R "$REAL_USER:" "$REAL_HOME/.gnupg"
+sudo -u "$REAL_USER" gpgconf --reload gpg-agent 2>/dev/null || true
+ok "GPG agent: default-cache-ttl = 0 (пароль спрашивается каждый раз)"
+
+# 9. Bash aliases
 msg "Adding aliases..."
 BASHRC="$REAL_HOME/.bashrc"
 if [ -f "$BASHRC" ] && ! grep -q 'secrets-otp' "$BASHRC" 2>/dev/null; then
@@ -154,7 +174,7 @@ else
     ok "Aliases already present"
 fi
 
-# 9. Setup info
+# 10. Setup info
 msg "Saving setup info..."
 cat > /root/.secrets-otp/setup-info.txt << META
 Secrets Vault Setup v${SCRIPT_VERSION}
@@ -169,13 +189,13 @@ META
 chmod 600 /root/.secrets-otp/setup-info.txt
 ok "Setup info saved"
 
-# 10. Smoke test
+# 11. Smoke test
 msg "Smoke test..."
 echo -n "  TOTP:            "; sudo -n secrets-otp 2>&1 || echo "FAIL"
-echo -n "  test/hello:      "; sudo -n secrets-otp "test/hello" 2>&1 || echo "FAIL"
-C=`sudo -n secrets-otp "test/hello" 2>/dev/null`
-echo -n "  verify correct:  "; sudo -n secrets-verify "test/hello" "$C" 2>&1 || echo "FAIL"
-echo -n "  verify wrong:    "; sudo -n secrets-verify "test/hello" "000000" 2>&1 || echo "FAIL"
+echo -n "  TEST_KEY:        "; sudo -n secrets-otp "TEST_KEY" 2>&1 || echo "FAIL"
+C=`sudo -n secrets-otp "TEST_KEY" 2>/dev/null`
+echo -n "  verify correct:  "; sudo -n secrets-verify "TEST_KEY" "$C" 2>&1 || echo "FAIL"
+echo -n "  verify wrong:    "; sudo -n secrets-verify "TEST_KEY" "000000" 2>&1 || echo "FAIL"
 echo ""
 ok "All checks done"
 
