@@ -140,7 +140,7 @@ SCRIPT" rows="3"></textarea>
 
       <details style="margin-top:10px;text-align:left">
         <summary style="font-size:11px;color:#555;cursor:pointer">🔍 Что внутри payload</summary>
-        <div style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;word-break:break-all">
+        <div style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;word-break:break-all;white-space:pre-wrap">
           <div id="plaintextOp" style="color:#7c5cfc"></div>
           <div id="plaintextName" style="color:#e0e0e0"></div>
           <div id="plaintextOtp" style="color:#4caf50"></div>
@@ -354,10 +354,12 @@ async function encryptOperation() {
 
     // Generate OTP bound to this operation + secret name
     const otpCmd = 'encrypted_' + op + ' ' + name;
-    const otp = await genOTP(keyBytes, otpCmd, tw);
+    const otpCurr = await genOTP(keyBytes, otpCmd, tw);
+    const otpNext = await genOTP(keyBytes, otpCmd, tw + 1);
 
     // Build plaintext: <operation> <name> <otp> [value]
-    const plaintext = op + ' ' + name + ' ' + otp + (value ? '\n' + value : '');
+    // Embed only current OTP (server checks ±1 window anyway)
+    const plaintext = op + ' ' + name + ' ' + otpCurr + (value ? '\n' + value : '');
 
     // Encrypt with AES-128-CBC (first 16 bytes of key)
     const aesKey = keyBytes.slice(0, 16);
@@ -371,18 +373,20 @@ async function encryptOperation() {
     const windowRemaining = 300 - (now_s % 300);
     const m = Math.floor(windowRemaining / 60);
     const s = windowRemaining % 60;
-    $('encryptRemaining').textContent = '⏱ OTP истекает через ' + m + 'м ' + s + 'с (окно 5 мин)';
+    $('encryptRemaining').textContent = '⏱ Истекает через ' + m + 'м ' + s + 'с (окно 5 мин)';
 
     // Show what's inside the payload
     if (op === 'set_secret') {
       $('plaintextOp').textContent = '│ set_secret';
       $('plaintextName').textContent = '│ ' + name;
-      $('plaintextOtp').textContent = '│ ' + otp + '  ← OTP (6 цифр)';
+      $('plaintextOtp').textContent =
+        '│ ' + otpCurr + ' — вшит в payload (текущий)\n│ ' + otpNext + ' — можно использовать след.';
       $('plaintextValue').textContent = '│\n└─ ' + value.replace(/\n/g, '\n   ');
     } else {
       $('plaintextOp').textContent = '│ delete_secret';
       $('plaintextName').textContent = '│ ' + name;
-      $('plaintextOtp').textContent = '│ ' + otp + '  ← OTP (6 цифр)';
+      $('plaintextOtp').textContent =
+        '│ ' + otpCurr + ' — вшит в payload (текущий)\n│ ' + otpNext + ' — можно использовать след.';
       $('plaintextValue').textContent = '';
     }
 
