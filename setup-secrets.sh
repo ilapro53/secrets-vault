@@ -51,10 +51,13 @@ ok "/root/.secrets-otp/totp-secret"
 msg "Creating sudoers..."
 cat > /etc/sudoers.d/secrets-otp << 'SUDO'
 # Secrets Vault — passwordless access for OTP tools
+# Only scripts that read /root/.secrets-otp/totp-secret internally
 ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-otp *
 ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-verify *
 ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-bash-executor *
-ALL ALL=(root) NOPASSWD: /bin/cat /root/.secrets-otp/totp-secret
+ALL ALL=(root) NOPASSWD: /usr/local/bin/secrets-encrypted-op *
+# NEVER add /bin/cat here — agent would read the TOTP secret
+# User reads the key via: sudo cat /root/.secrets-otp/totp-secret (with password)
 SUDO
 chmod 440 /etc/sudoers.d/secrets-otp
 ok "/etc/sudoers.d/secrets-otp"
