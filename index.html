@@ -111,6 +111,7 @@ secrets-bash-executor --secrets VPS_HOST,VPS_KEY - <<'SCRIPT'
 ssh ...
 SCRIPT" rows="3"></textarea>
     <div class="tip">Вставь имя секрета (как переменную: SSH_KEY) или команду агента целиком — код будет одинаковым</div>
+    <button class="btn" onclick="generateCode()">🔑 Сгенерировать код</button>
   </div>
 
   <!-- Encrypted operation mode -->
@@ -147,8 +148,6 @@ SCRIPT" rows="3"></textarea>
       <div class="hint">Агент выполнит: secrets-encrypted-op SECRET_...</div>
     </div>
   </div>
-
-  <button class="btn" onclick="generateCode()">🔑 Сгенерировать код</button>
 
   <div class="error" id="error"></div>
 
