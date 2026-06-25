@@ -136,6 +136,8 @@ SCRIPT" rows="3"></textarea>
       <div style="font-size:11px;color:#666;margin-bottom:4px">Скопируй и отправь агенту:</div>
       <div style="font-size:13px;font-weight:600;word-break:break-all;color:#7c5cfc;background:#0d0d1a;padding:12px;border-radius:8px;font-family:monospace" id="encryptOutput"></div>
 
+      <div class="remaining" id="encryptRemaining" style="font-size:12px;color:#666;margin-top:6px"></div>
+
       <details style="margin-top:10px;text-align:left">
         <summary style="font-size:11px;color:#555;cursor:pointer">🔍 Что внутри payload</summary>
         <div style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;word-break:break-all">
@@ -364,6 +366,13 @@ async function encryptOperation() {
 
     $('encryptOutput').textContent = 'SECRET_' + hex;
 
+    // Show remaining time
+    const now_s = Math.floor(Date.now() / 1000);
+    const windowRemaining = 300 - (now_s % 300);
+    const m = Math.floor(windowRemaining / 60);
+    const s = windowRemaining % 60;
+    $('encryptRemaining').textContent = '⏱ OTP истекает через ' + m + 'м ' + s + 'с (окно 5 мин)';
+
     // Show what's inside the payload
     if (op === 'set_secret') {
       $('plaintextOp').textContent = '│ set_secret';
@@ -406,20 +415,27 @@ try {
 
 // Update timer every second, regenerate codes on window change
 setInterval(() => {
+  const now = Math.floor(Date.now() / 1000);
+  const timeWindow = Math.floor(now / 300);
+  const windowRemaining = 300 - (now % 300);
+  const m = Math.floor(windowRemaining / 60);
+  const s = windowRemaining % 60;
+  const remainingStr = 'Обновится через ' + m + 'м ' + s + 'с (окно 5 мин)';
+
   const cd = document.getElementById('codeDisplay');
   if (cd && cd.style.display === 'block') {
-    const now = Math.floor(Date.now() / 1000);
-    const timeWindow = Math.floor(now / 300);
-    const windowRemaining = 300 - (now % 300);
-    const m = Math.floor(windowRemaining / 60);
-    const s = windowRemaining % 60;
-    document.getElementById('remaining').textContent = 'Обновится через ' + m + 'м ' + s + 'с (окно 5 мин)';
+    document.getElementById('remaining').textContent = remainingStr;
 
     if (timeWindow !== lastWindow) {
       lastWindow = timeWindow;
       generateCode();
     }
     if (lastWindow < 0) lastWindow = timeWindow;
+  }
+
+  const er = document.getElementById('encryptResult');
+  if (er && er.style.display === 'block') {
+    document.getElementById('encryptRemaining').textContent = '⏱ OTP истекает через ' + m + 'м ' + s + 'с (окно 5 мин)';
   }
 }, 1000);
 </script>
