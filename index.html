@@ -140,12 +140,7 @@ SCRIPT" rows="3"></textarea>
 
       <details style="margin-top:10px;text-align:left">
         <summary style="font-size:11px;color:#555;cursor:pointer">🔍 Что внутри payload</summary>
-        <div style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;word-break:break-all;white-space:pre-wrap">
-          <div id="plaintextOp" style="color:#7c5cfc"></div>
-          <div id="plaintextName" style="color:#e0e0e0"></div>
-          <div id="plaintextOtp" style="color:#4caf50"></div>
-          <div id="plaintextValue" style="color:#888"></div>
-        </div>
+        <div id="plaintextPreview" style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;text-align:left"></div>
         <div style="font-size:10px;color:#555;margin-top:4px">Агент видит только <code style="background:#16162a;padding:1px 4px;border-radius:3px">SECRET_...</code>, значение скрыто</div>
       </details>
 
@@ -375,19 +370,23 @@ async function encryptOperation() {
     const s = windowRemaining % 60;
     $('encryptRemaining').textContent = '⏱ Истекает через ' + m + 'м ' + s + 'с (окно 5 мин)';
 
-    // Show what's inside the payload
+    // Show what's inside the payload (single text block)
     if (op === 'set_secret') {
-      $('plaintextOp').textContent = '│ set_secret';
-      $('plaintextName').textContent = '│ ' + name;
-      $('plaintextOtp').textContent =
-        '│ ' + otpCurr + ' — вшит в payload (текущий)\n│ ' + otpNext + ' — можно использовать след.';
-      $('plaintextValue').textContent = '│\n└─ ' + value.replace(/\n/g, '\n   ');
+      $('plaintextPreview').textContent =
+        '│ set_secret\n' +
+        '│ ' + name + '\n' +
+        '│\n' +
+        '├─ ' + otpCurr + ' — в payload (текущий)\n' +
+        '├─ ' + otpNext + ' — можно использовать след.\n' +
+        '│\n' +
+        '└─ value: ' + value.replace(/\n/g, '\n   ');
     } else {
-      $('plaintextOp').textContent = '│ delete_secret';
-      $('plaintextName').textContent = '│ ' + name;
-      $('plaintextOtp').textContent =
-        '│ ' + otpCurr + ' — вшит в payload (текущий)\n│ ' + otpNext + ' — можно использовать след.';
-      $('plaintextValue').textContent = '';
+      $('plaintextPreview').textContent =
+        '│ delete_secret\n' +
+        '│ ' + name + '\n' +
+        '│\n' +
+        '├─ ' + otpCurr + ' — в payload (текущий)\n' +
+        '└─ ' + otpNext + ' — можно использовать след.';
     }
 
     $('encryptResult').style.display = 'block';
