@@ -104,13 +104,13 @@ textarea { resize: vertical; min-height: 44px; }
   <!-- Code generation mode (simplified — one field) -->
   <div class="panel active" id="panel-code">
     <label for="codeInput">Имя секрета или команда агента</label>
-    <textarea id="codeInput" placeholder="Например: ssh/deploy-key
+    <textarea id="codeInput" placeholder="Например: SSH_KEY
 
 Или целиком команда от агента:
 secrets-bash-executor --secrets VPS_HOST,VPS_KEY - <<'SCRIPT'
 ssh ...
 SCRIPT" rows="3"></textarea>
-    <div class="tip">Вставь имя секрета из pass или команду агента целиком — код будет одинаковым</div>
+    <div class="tip">Вставь имя секрета (как переменную: SSH_KEY) или команду агента целиком — код будет одинаковым</div>
   </div>
 
   <!-- Encrypted operation mode -->
@@ -121,8 +121,8 @@ SCRIPT" rows="3"></textarea>
       <option value="delete_secret">delete_secret — удалить секрет</option>
     </select>
 
-    <label for="opName">Имя секрета (pass path)</label>
-    <input type="text" id="opName" placeholder="Например: github/token" autocomplete="off">
+    <label for="opName">Имя секрета</label>
+    <input type="text" id="opName" placeholder="Например: GITHUB_TOKEN" autocomplete="off">
 
     <div id="opValueGroup">
       <label for="opValue">Значение секрета</label>
@@ -135,6 +135,18 @@ SCRIPT" rows="3"></textarea>
     <div class="code-display" id="encryptResult" style="display:none">
       <div style="font-size:11px;color:#666;margin-bottom:4px">Скопируй и отправь агенту:</div>
       <div style="font-size:13px;font-weight:600;word-break:break-all;color:#7c5cfc;background:#0d0d1a;padding:12px;border-radius:8px;font-family:monospace" id="encryptOutput"></div>
+
+      <details style="margin-top:10px;text-align:left">
+        <summary style="font-size:11px;color:#555;cursor:pointer">🔍 Что внутри payload</summary>
+        <div style="background:#0d0d1a;padding:10px;border-radius:8px;margin-top:6px;font-family:monospace;font-size:12px;line-height:1.6;word-break:break-all">
+          <div id="plaintextOp" style="color:#7c5cfc"></div>
+          <div id="plaintextName" style="color:#e0e0e0"></div>
+          <div id="plaintextOtp" style="color:#4caf50"></div>
+          <div id="plaintextValue" style="color:#888"></div>
+        </div>
+        <div style="font-size:10px;color:#555;margin-top:4px">Агент видит только <code style="background:#16162a;padding:1px 4px;border-radius:3px">SECRET_...</code>, значение скрыто</div>
+      </details>
+
       <div class="hint">Агент выполнит: secrets-encrypted-op SECRET_...</div>
     </div>
   </div>
@@ -351,6 +363,20 @@ async function encryptOperation() {
     const hex = toHex(encrypted);
 
     $('encryptOutput').textContent = 'SECRET_' + hex;
+
+    // Show what's inside the payload
+    if (op === 'set_secret') {
+      $('plaintextOp').textContent = '│ set_secret';
+      $('plaintextName').textContent = '│ ' + name;
+      $('plaintextOtp').textContent = '│ ' + otp + '  ← OTP (6 цифр)';
+      $('plaintextValue').textContent = '│\n└─ ' + value.replace(/\n/g, '\n   ');
+    } else {
+      $('plaintextOp').textContent = '│ delete_secret';
+      $('plaintextName').textContent = '│ ' + name;
+      $('plaintextOtp').textContent = '│ ' + otp + '  ← OTP (6 цифр)';
+      $('plaintextValue').textContent = '';
+    }
+
     $('encryptResult').style.display = 'block';
   } catch (e) {
     error.textContent = 'Ошибка: ' + e.message;
