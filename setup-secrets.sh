@@ -9,7 +9,7 @@ ok()   { echo -e "  ${GRN}✓${RST} $*"; }
 info() { echo -e "  ${CYN}→${RST} $*"; }
 warn() { echo -e "  ${YLW}⚠${RST} $*"; }
 err()  { echo -e "  ${RED}✗${RST} $*"; }
-TOTAL=11
+TOTAL=12
 
 echo "╔══════════════════════════════════════════════════╗"
 echo "║   Secrets Vault v${SCRIPT_VERSION}                         ║"
@@ -140,7 +140,13 @@ else
     ok "pass initialized"
 fi
 
-# 8. GPG agent — no caching (each secret operation asks passphrase)
+# 8. Restrict ptrace — prevent agent from reading pass memory
+msg "Hardening ptrace..."
+sysctl -w kernel.yama.ptrace_scope=1 >/dev/null 2>&1 || true
+echo 'kernel.yama.ptrace_scope=1' > /etc/sysctl.d/99-secrets-vault.conf 2>/dev/null || true
+ok "kernel.yama.ptrace_scope = 1 (ptrace only parent→child)"
+
+# 9. GPG agent — no caching (each secret operation asks passphrase)
 msg "Hardening GPG agent..."
 mkdir -p "$REAL_HOME/.gnupg"
 chmod 700 "$REAL_HOME/.gnupg"
@@ -160,7 +166,7 @@ chown -R "$REAL_USER:" "$REAL_HOME/.gnupg"
 sudo -u "$REAL_USER" gpgconf --reload gpg-agent 2>/dev/null || true
 ok "GPG agent: default-cache-ttl = 0 (пароль спрашивается каждый раз)"
 
-# 9. Bash aliases
+# 10. Bash aliases
 msg "Adding aliases..."
 BASHRC="$REAL_HOME/.bashrc"
 if [ -f "$BASHRC" ] && ! grep -q 'secrets-otp' "$BASHRC" 2>/dev/null; then
@@ -177,7 +183,7 @@ else
     ok "Aliases already present"
 fi
 
-# 10. Setup info
+# 11. Setup info
 msg "Saving setup info..."
 cat > /root/.secrets-otp/setup-info.txt << META
 Secrets Vault Setup v${SCRIPT_VERSION}
@@ -192,7 +198,7 @@ META
 chmod 600 /root/.secrets-otp/setup-info.txt
 ok "Setup info saved"
 
-# 11. Smoke test
+# 12. Smoke test
 msg "Smoke test..."
 echo -n "  TOTP:            "; sudo -n secrets-otp 2>&1 || echo "FAIL"
 echo -n "  TEST_KEY:        "; sudo -n secrets-otp "TEST_KEY" 2>&1 || echo "FAIL"
